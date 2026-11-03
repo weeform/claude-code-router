@@ -65,7 +65,11 @@ export function spawnGatewayProcess(
     cwd: CONFIGDIR,
     env,
     serialization: "advanced",
-    stdio: ["ignore", "pipe", "pipe", "ipc"]
+    stdio: ["ignore", "pipe", "pipe", "ipc"],
+    // Keep the gateway runtime console-less on Windows: the parent is a GUI
+    // process without a console, so an unhidden console-subsystem child would
+    // allocate (and pop up) a fresh node.exe window.
+    windowsHide: true
   });
   captureGatewayChildOutput(child);
   if (!child.send) {
