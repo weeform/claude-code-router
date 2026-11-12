@@ -1021,6 +1021,53 @@ test("OpenCode Zen model discovery keeps paid models when the probe supplies an 
   });
 });
 
+test("probes against the official OpenCode Go endpoint always carry x-opencode-session", async (t) => {
+  const previousFetch = globalThis.fetch;
+  const requests = [];
+  globalThis.fetch = async (url, init) => {
+    requests.push({ url: String(url), headers: new Headers(init.headers) });
+    return new Response(JSON.stringify({ error: { message: "MissingSessionID" } }), { status: 400 });
+  };
+  t.after(() => { globalThis.fetch = previousFetch; });
+
+  await probeGatewayProvider({
+    baseUrl: "https://opencode.ai/zen/go/v1",
+    apiKey: "oc_sk-probe-key",
+    forceRefresh: true,
+    mode: "protocols",
+    protocols: ["anthropic_messages"]
+  });
+
+  assert.ok(requests.length > 0);
+  for (const request of requests) {
+    assert.match(request.url, /^https:\/\/opencode\.ai\/zen\/go\/v1\//);
+    assert.match(request.headers.get("x-opencode-session") ?? "", /^ccr-/);
+  }
+});
+
+test("probes against other providers do not send x-opencode-session", async (t) => {
+  const previousFetch = globalThis.fetch;
+  const requests = [];
+  globalThis.fetch = async (url, init) => {
+    requests.push({ url: String(url), headers: new Headers(init.headers) });
+    return new Response(JSON.stringify({ error: { message: "not found" } }), { status: 404 });
+  };
+  t.after(() => { globalThis.fetch = previousFetch; });
+
+  await probeGatewayProvider({
+    baseUrl: "https://api.anthropic.com",
+    apiKey: "sk-ant-probe-key",
+    forceRefresh: true,
+    mode: "protocols",
+    protocols: ["anthropic_messages"]
+  });
+
+  assert.ok(requests.length > 0);
+  for (const request of requests) {
+    assert.equal(request.headers.get("x-opencode-session"), null);
+  }
+});
+
 function jwt(payload) {
   return [
     base64url({ alg: "none", typ: "JWT" }),

@@ -18,6 +18,7 @@ import { localAgentProviderApiKey } from "@ccr/core/agents/local-providers/share
 import { readClaudeCodeOauth } from "@ccr/core/agents/local-providers/service";
 import { isLocalClaudeCodeOauthProviderPlugin, mergeAnthropicBetaValues } from "@ccr/core/providers/oauth-plugin";
 import { findProviderPresetByBaseUrl, providerApiKeySafetyIssue } from "@ccr/core/providers/presets/index";
+import { isOfficialOpenCodeGoUrl, openCodeGoFallbackSessionHeaderValue } from "@ccr/core/gateway/core-runtime/upstream-header-sanitizer";
 import { getProviderCatalogModels } from "@ccr/core/providers/model-catalog";
 import { fetchWithSystemProxy } from "@ccr/core/proxy/system-proxy-fetch";
 import {
@@ -972,6 +973,19 @@ async function providerProbeAuthRequest(
       headers.set("authorization", `Bearer ${token}`);
       headers.delete("x-api-key");
       headers.set("anthropic-beta", mergeAnthropicBetaValues(headers.get("anthropic-beta") ?? undefined, "oauth-2025-04-20"));
+      request = { ...request, init: { ...request.init, headers } };
+    }
+  }
+
+  {
+    // The official OpenCode Go endpoint rejects requests without a session id
+    // (400 MissingSessionID). The gateway forwarding path injects one at the
+    // provider boundary; provider probes must bring their own so model refresh
+    // and connectivity checks stop accumulating 400s. A session header set by
+    // a provider plugin transform wins over the fallback.
+    const headers = new Headers(request.init.headers);
+    if (!headers.get("x-opencode-session")?.trim() && isOfficialOpenCodeGoUrl(request.url)) {
+      headers.set("x-opencode-session", openCodeGoFallbackSessionHeaderValue());
       request = { ...request, init: { ...request.init, headers } };
     }
   }

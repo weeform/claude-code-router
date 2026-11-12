@@ -129,7 +129,7 @@ function requestHeaderValue(
   return undefined;
 }
 
-function isOfficialOpenCodeGoUrl(value: string | undefined): boolean {
+export function isOfficialOpenCodeGoUrl(value: string | undefined): boolean {
   if (!value) return false;
   try {
     const url = new URL(value);
@@ -148,6 +148,15 @@ function isOfficialOpenCodeGoChatUrl(value: string | undefined): boolean {
   if (!value || !isOfficialOpenCodeGoUrl(value)) return false;
   const url = new URL(value);
   return /^\/zen\/go\/v1\/chat\/completions\/?$/.test(url.pathname);
+}
+
+/**
+ * Stable process-level session id used when no client session can be derived.
+ * Shared by the gateway forwarding path and provider probes so all CCR-originated
+ * requests to the official OpenCode Go endpoint present one session identity.
+ */
+export function openCodeGoFallbackSessionHeaderValue(): string {
+  return `ccr-${openCodeSessionFallbackId}`;
 }
 
 function isOfficialOpenCodeGoChatRequest(
@@ -308,7 +317,7 @@ export function createGatewayPlugin() {
                   inboundMetadataUserId(input.request?.body)
                 )
               );
-              upstreamRequest.headers["x-opencode-session"] = claudeSessionId || `ccr-${openCodeSessionFallbackId}`;
+              upstreamRequest.headers["x-opencode-session"] = claudeSessionId || openCodeGoFallbackSessionHeaderValue();
             }
           } catch {
             // Invalid URLs are reported by the upstream transport.
