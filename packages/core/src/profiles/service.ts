@@ -1,6 +1,5 @@
 import { chmodSync, copyFileSync, existsSync, lstatSync, mkdirSync, readlinkSync, readdirSync, readFileSync, rmSync, statSync, symlinkSync, writeFileSync } from "node:fs";
 import { createHash } from "node:crypto";
-import os from "node:os";
 import path from "node:path";
 import { CLAUDE_CODE_ENABLE_GATEWAY_MODEL_DISCOVERY_ENV, NO_AVAILABLE_GATEWAY_MODELS_MESSAGE, availableGatewayModelIds, enforceSingleEnabledGlobalProfilePerAgent, hasAvailableGatewayModels, isGatewayProviderEnabled, type AppConfig, type ProfileApplyResult, type ProfileClientApplyStatus, type ProfileClientKind, type ProfileConfig } from "@ccr/core/contracts/app";
 import { CLAUDE_CODE_AUTH_MODE_ENV, resolveClaudeCodeGatewayAuthMode, type ClaudeCodeGatewayAuthMode } from "@ccr/core/agents/claude-code/auth-mode";
@@ -38,6 +37,7 @@ import {
   writePiGatewayConfig
 } from "@ccr/core/agents/pi/profile-config";
 import { CONFIGDIR } from "@ccr/core/config/constants";
+import { resolveRuntimeAppPath } from "@ccr/core/runtime/app-paths";
 import { pruneInactiveProfileApiKeysFromList, syncProfileApiKeys } from "@ccr/core/profiles/api-key";
 import { profileAllowedModels } from "@ccr/core/profiles/model-allowlist";
 import { refreshClaudeAppModelDiscoveryCache } from "@ccr/core/agents/claude-app/gateway-service";
@@ -4112,10 +4112,10 @@ function normalizeClientModel(value: string | undefined): string {
 function resolveUserPath(value: string): string {
   const trimmed = value.trim();
   if (trimmed === "~") {
-    return os.homedir();
+    return resolveRuntimeAppPath("home");
   }
   if (trimmed.startsWith("~/") || trimmed.startsWith("~\\")) {
-    return path.join(os.homedir(), trimmed.slice(2));
+    return path.join(resolveRuntimeAppPath("home"), trimmed.slice(2));
   }
   return path.resolve(trimmed || ".");
 }

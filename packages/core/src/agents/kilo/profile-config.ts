@@ -5,6 +5,7 @@ import { buildCodexModelCatalogIds } from "@ccr/core/agents/codex/model-catalog"
 import { parseJsoncRecord } from "@ccr/core/agents/local-providers/shared";
 import { isGatewayProviderEnabled, type AppConfig, type ProfileConfig } from "@ccr/core/contracts/app";
 import { profileAllowedModels } from "@ccr/core/profiles/model-allowlist";
+import { resolveRuntimeAppPath } from "@ccr/core/runtime/app-paths";
 
 export type KiloProfileConfigWriteResult = {
   backupFile?: string;
@@ -241,10 +242,10 @@ function kiloXdgRoot(environmentName: "XDG_CONFIG_HOME", fallback: string): stri
 function resolveUserPath(value: string): string {
   const trimmed = value.trim();
   if (trimmed === "~") {
-    return os.homedir();
+    return resolveRuntimeAppPath("home");
   }
   if (trimmed.startsWith("~/") || trimmed.startsWith("~\\")) {
-    return path.join(os.homedir(), trimmed.slice(2));
+    return path.join(resolveRuntimeAppPath("home"), trimmed.slice(2));
   }
   return path.resolve(trimmed || ".");
 }

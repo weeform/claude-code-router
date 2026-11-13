@@ -248,5 +248,6 @@ function resolveUserPath(value: string): string {
 }
 
 function homeDir(): string {
-  return process.env.HOME || process.env.USERPROFILE || os.homedir() || ".";
+  const internalHome = process.env.CCR_INTERNAL_HOME_DIR?.trim();
+  return internalHome || process.env.HOME || process.env.USERPROFILE || os.homedir() || ".";
 }

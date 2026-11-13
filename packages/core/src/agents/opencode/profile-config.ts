@@ -8,6 +8,7 @@ import { findModelCatalogEntry, findProviderModelCatalogEntry, type ModelCatalog
 import { modelRegistryForConfig } from "@ccr/core/routing/model-registry";
 import { resolveUsageModelAttribution } from "@ccr/core/usage/model-attribution";
 import { profileAllowedModels } from "@ccr/core/profiles/model-allowlist";
+import { resolveRuntimeAppPath } from "@ccr/core/runtime/app-paths";
 
 export type OpenCodeProfileConfigWriteResult = {
   backupFile?: string;
@@ -333,10 +334,10 @@ function openCodeXdgRoot(environmentName: "XDG_CONFIG_HOME", fallback: string): 
 function resolveUserPath(value: string): string {
   const trimmed = value.trim();
   if (trimmed === "~") {
-    return os.homedir();
+    return resolveRuntimeAppPath("home");
   }
   if (trimmed.startsWith("~/") || trimmed.startsWith("~\\")) {
-    return path.join(os.homedir(), trimmed.slice(2));
+    return path.join(resolveRuntimeAppPath("home"), trimmed.slice(2));
   }
   return path.resolve(trimmed || ".");
 }

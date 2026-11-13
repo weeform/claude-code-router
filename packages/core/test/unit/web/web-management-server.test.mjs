@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
-import { mkdtempSync, rmSync } from "node:fs";
+import { createHash } from "node:crypto";
+import { mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { createServer } from "node:http";
 import net from "node:net";
 import os from "node:os";
@@ -20,7 +21,13 @@ after(() => {
   setOptionalEnv("CCR_INTERNAL_APP_DATA_DIR", previousRuntimeEnv.appData);
   setOptionalEnv("CCR_INTERNAL_HOME_DIR", previousRuntimeEnv.home);
   setOptionalEnv("CCR_INTERNAL_USER_DATA_DIR", previousRuntimeEnv.userData);
-  rmSync(runtimeRoot, { force: true, recursive: true });
+  try {
+    // Windows releases directory handles asynchronously (delete-pending), so
+    // give rmSync a few retries before giving up on cleanup.
+    rmSync(runtimeRoot, { force: true, maxRetries: 10, recursive: true, retryDelay: 100 });
+  } catch (error) {
+    console.warn(`Failed to clean up test runtime root ${runtimeRoot}: ${error}`);
+  }
 });
 
 test("normalizeExternalHttpTarget accepts absolute http, https, and CCR plugin URLs only", async () => {
@@ -107,6 +114,8 @@ test("startGateway reuses an already healthy CCR gateway on the configured port"
   };
 
   try {
+    const realClaudeSettings = path.join(os.homedir(), ".claude", "settings.json");
+    const realSettingsBefore = snapshotFile(realClaudeSettings);
     const payload = await rpc(runtime.url, webAuthToken, "startGateway");
 
     assert.equal(payload.ok, true);
@@ -122,6 +131,23 @@ test("startGateway reuses an already healthy CCR gateway on the configured port"
     assert.equal(secondStart.value.endpoint, `http://127.0.0.1:${gatewayPort}`);
     assert.equal(secondStart.value.gatewayManagedExternally, true);
     assert.equal(managedStarts, 0);
+
+    // Regression guard: profile application triggered by startGateway must stay
+    // inside the isolated runtime home (CCR_INTERNAL_HOME_DIR) and must never
+    // rewrite the developer's real ~/.claude/settings.json with the test
+    // gateway's random port and temp apiKeyHelper.
+    assertFileUnchanged(
+      realClaudeSettings,
+      realSettingsBefore,
+      "startGateway profile apply must not rewrite the real ~/.claude/settings.json"
+    );
+    const isolatedSettingsFile = path.join(runtimeRoot, "home", ".claude", "settings.json");
+    const isolatedSettings = JSON.parse(readFileSync(isolatedSettingsFile, "utf8"));
+    assert.equal(
+      isolatedSettings.env.ANTHROPIC_BASE_URL,
+      `http://127.0.0.1:${gatewayPort}`,
+      "profile apply should target the isolated runtime home"
+    );
 
     const nextConfig = structuredClone(savedConfig);
     nextConfig.Providers[0].name = "Updated Test Provider";
@@ -236,6 +262,23 @@ async function findAvailablePort() {
       });
     });
   });
+}
+
+function snapshotFile(file) {
+  try {
+    const content = readFileSync(file);
+    return { exists: true, sha256: createHash("sha256").update(content).digest("hex") };
+  } catch {
+    return { exists: false };
+  }
+}
+
+function assertFileUnchanged(file, before, message) {
+  const after = snapshotFile(file);
+  assert.equal(after.exists, before.exists, message);
+  if (before.exists) {
+    assert.equal(after.sha256, before.sha256, message);
+  }
 }
 
 function setOptionalEnv(key, value) {

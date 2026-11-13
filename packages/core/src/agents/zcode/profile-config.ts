@@ -5,6 +5,7 @@ import { isGatewayProviderEnabled, type AppConfig, type ProfileConfig } from "@c
 import { normalizeRouteSelector } from "@ccr/core/gateway/claude-code-router-plugin";
 import { buildZcodeModelCatalog } from "@ccr/core/agents/zcode/model-catalog";
 import { profileAllowedModels } from "@ccr/core/profiles/model-allowlist";
+import { resolveRuntimeAppPath } from "@ccr/core/runtime/app-paths";
 
 export type ZcodeProfileConfigWriteResult = {
   backupFile?: string;
@@ -333,10 +334,10 @@ function positiveNumber(value: unknown): number | undefined {
 function resolveUserPath(value: string): string {
   const trimmed = value.trim();
   if (trimmed === "~") {
-    return os.homedir();
+    return resolveRuntimeAppPath("home");
   }
   if (trimmed.startsWith("~/") || trimmed.startsWith("~\\")) {
-    return path.join(os.homedir(), trimmed.slice(2));
+    return path.join(resolveRuntimeAppPath("home"), trimmed.slice(2));
   }
   return path.resolve(trimmed || ".");
 }
