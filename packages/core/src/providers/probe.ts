@@ -369,7 +369,13 @@ async function resolveGatewayProviderProbe(request: GatewayProviderProbeRequest)
   const models = (mode === "connectivity" || mode === "models") && resolvedModelProbe.models.length > 0
     ? resolvedModelProbe.models
     : typedModels;
-  const protocolResults = await probeProtocols(parsed, request.apiKey, models, protocols, mode, request.providerPlugins ?? []);
+  // Protocol support probes POST intentionally invalid bodies (no model field)
+  // and read the validation error as "endpoint exists". Callers that ignore
+  // protocol results — the periodic model auto-refresh — opt out so strict
+  // servers do not accumulate rejected 400s in their request logs.
+  const protocolResults = request.skipProtocolProbes
+    ? []
+    : await probeProtocols(parsed, request.apiKey, models, protocols, mode, request.providerPlugins ?? []);
   const detectedProtocol = detectProtocol(parsed, protocolResults, resolvedModelProbe.source, protocols);
   const normalizedBaseUrl = detectedProtocol
     ? resolveProbeBaseUrl(parsed, detectedProtocol, protocolResults, resolvedModelProbe)
@@ -415,7 +421,8 @@ function providerProbeCacheKey(request: GatewayProviderProbeRequest): string {
     models: uniqueStrings(request.models ?? []),
     providerPluginsHash: hashSensitiveValue(JSON.stringify(request.providerPlugins ?? [])),
     protocols: providerProbeProtocolsForBaseUrl(request.baseUrl, request.protocols ?? []),
-    skipModelDiscovery: request.skipModelDiscovery === true
+    skipModelDiscovery: request.skipModelDiscovery === true,
+    skipProtocolProbes: request.skipProtocolProbes === true
   });
 }
 

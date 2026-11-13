@@ -1068,6 +1068,71 @@ test("probes against other providers do not send x-opencode-session", async (t) 
   }
 });
 
+test("skipProtocolProbes fetches models without posting protocol support requests", async (t) => {
+  const home = useTemporaryCodexHome(t, "ccr-probe-skip-protocols-");
+  fs.mkdirSync(path.join(home, ".cache", "opencode"), { recursive: true });
+  const previousFetch = globalThis.fetch;
+  const requests = [];
+  globalThis.fetch = async (url, init) => {
+    requests.push(`${init.method ?? "GET"} ${String(url)}`);
+    return new Response(JSON.stringify({ data: [{ id: "go-chat" }] }), {
+      headers: { "content-type": "application/json" },
+      status: 200
+    });
+  };
+  t.after(() => { globalThis.fetch = previousFetch; });
+
+  const probe = await probeGatewayProvider({
+    baseUrl: "https://opencode.ai/zen/go/v1",
+    forceRefresh: true,
+    mode: "models",
+    protocols: ["openai_responses", "openai_chat_completions", "anthropic_messages"],
+    skipProtocolProbes: true
+  });
+
+  assert.deepEqual(probe.models, ["go-chat"]);
+  assert.deepEqual(probe.protocols, []);
+  assert.deepEqual(probe.capabilities, []);
+  // Only the model-list GET may leave the process; the empty-body protocol
+  // support POSTs are the 400-generating requests this flag exists to drop.
+  assert.deepEqual(requests, ["GET https://opencode.ai/zen/go/v1/models"]);
+});
+
+test("skipProtocolProbes result is cached separately from full probes", async (t) => {
+  const previousFetch = globalThis.fetch;
+  const requests = [];
+  globalThis.fetch = async (url, init) => {
+    requests.push(`${init.method ?? "GET"} ${String(url)}`);
+    if (String(url).endsWith("/models")) {
+      return new Response(JSON.stringify({ data: [{ id: "model-a" }] }), {
+        headers: { "content-type": "application/json" },
+        status: 200
+      });
+    }
+    return new Response(JSON.stringify({ error: { message: "`model` must be a non-empty string" } }), { status: 400 });
+  };
+  t.after(() => { globalThis.fetch = previousFetch; });
+
+  const base = {
+    baseUrl: "https://api.generic-models.test/v1",
+    mode: "models",
+    protocols: ["openai_responses"]
+  };
+  const skipped = await probeGatewayProvider({ ...base, skipProtocolProbes: true });
+  assert.deepEqual(skipped.models, ["model-a"]);
+  assert.deepEqual(skipped.protocols, []);
+  assert.deepEqual(requests, ["GET https://api.generic-models.test/v1/models"]);
+
+  const full = await probeGatewayProvider({ ...base });
+  assert.equal(full.protocols.length, 1);
+  assert.equal(full.protocols[0].supported, true);
+  assert.deepEqual(requests, [
+    "GET https://api.generic-models.test/v1/models",
+    "GET https://api.generic-models.test/v1/models",
+    "POST https://api.generic-models.test/v1/responses"
+  ]);
+});
+
 function jwt(payload) {
   return [
     base64url({ alg: "none", typ: "JWT" }),

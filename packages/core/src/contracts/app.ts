@@ -583,6 +583,15 @@ export type GatewayProviderProbeRequest = {
   providerPlugins?: unknown[];
   protocols?: GatewayProviderCapabilityProtocol[];
   skipModelDiscovery?: boolean;
+  /**
+   * Skips the per-protocol support probes — the intentionally invalid
+   * requests (empty body for chat protocols) whose validation error tells
+   * "endpoint exists" from "unknown route". Callers that only consume the
+   * model list — the periodic model auto-refresh — should set this: strict
+   * servers (e.g. the official OpenCode Go endpoint) log those probes as
+   * rejected 400 requests.
+   */
+  skipProtocolProbes?: boolean;
 };
 
 export type GatewayProviderProbeCandidate = {

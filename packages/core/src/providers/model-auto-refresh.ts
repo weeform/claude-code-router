@@ -138,7 +138,12 @@ export async function refreshAutoFetchProviderModels(
         mode: "models",
         models: provider.models,
         providerPlugins: providerPluginsForModelRefresh(config, provider),
-        protocols: providerModelRefreshProtocols(provider)
+        protocols: providerModelRefreshProtocols(provider),
+        // The refresh only consumes models/display names/metadata; protocol
+        // support results are discarded. Skip the support probes so the
+        // periodic refresh stops posting empty-body requests that strict
+        // servers (official OpenCode Go) record as rejected 400s.
+        skipProtocolProbes: true
       });
       const discovered = mergeProviderModelCatalogSnapshots(probe, localProviderModelCatalogSnapshot(provider));
       const fetchedModels = uniqueModelList(discovered.models);

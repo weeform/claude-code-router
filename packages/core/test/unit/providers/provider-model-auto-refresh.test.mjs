@@ -110,6 +110,7 @@ test("auto model refresh adds new provider models and extends matching profile a
   assert.equal(calls[0].apiKey, "sk-provider");
   assert.equal(calls[0].mode, "models");
   assert.equal(calls[0].forceRefresh, true);
+  assert.equal(calls[0].skipProtocolProbes, true);
   assert.deepEqual(result.config.Providers[0].models, ["alpha", "beta"]);
   assert.deepEqual(result.config.Providers[0].autoFetchKnownModels, ["alpha", "beta"]);
   assert.deepEqual(result.config.Providers[0].modelDisplayNames, { beta: "Beta" });
